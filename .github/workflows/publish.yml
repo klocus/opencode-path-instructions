@@ -31,7 +31,7 @@ jobs:
       - name: Setup Node.js and enable npm cache
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
 
@@ -43,5 +43,3 @@ jobs:
 
       - name: Publish to npm (via Trusted Publisher OIDC)
         run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

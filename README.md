@@ -20,22 +20,22 @@ The plugin automatically injects context-specific coding standards into the AI a
 
 ## Installation
 
+### As an npm package
+
+Add the package name to your `opencode.json`:
+
+```json
+{
+  "plugin": ["@klocus/opencode-path-instructions"]
+}
+```
+
 ### As a local plugin
 
 Copy `src/path-instructions.ts` into `.opencode/plugins/` in your project:
 
 ```bash
 cp src/path-instructions.ts /your-project/.opencode/plugins/path-instructions.ts
-```
-
-### As an npm package
-
-Add to your `opencode.json`:
-
-```json
-{
-  "plugin": ["opencode-path-instructions"]
-}
 ```
 
 ## How to use it?
@@ -80,9 +80,6 @@ When the AI performs a `read`, `edit`, or `write` operation on a file, the plugi
 
 ```
 [file contents...]
-
----
-📋 Path instructions loaded for `src/auth.ts`: `typescript`, `backend`
 
 <path-instruction:typescript>
 Path Instructions: typescript (applies to: **/*.ts, **/*.tsx)

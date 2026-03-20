@@ -59,16 +59,11 @@ The plugin will handle the rest, notifying you via the tool output whenever path
 
 ### Injection
 
-When the AI performs an `edit` or `write` operation on a file, the plugin:
+When the AI performs an `edit`, `read` or `write` operation on a file, the plugin:
 
 1. Finds all `*.instructions.md` files whose `applyTo` patterns match the target file path.
 2. Injects them **once per session** — subsequent operations on matching files won't repeat the injection.
 3. Appends the instructions to the tool output with a visible metadata header, so the AI can see which instructions were applied and follow them.
-
-### Loading
-
-- The plugin scans `.github/instructions/` and `.opencode/instructions/` recursively at startup.
-- Changes to instruction files are picked up on restart.
 
 ### Frontmatter notes
 

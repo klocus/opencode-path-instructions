@@ -14,9 +14,9 @@
  *   Your instructions here...
  */
 
+import type { Plugin } from '@opencode-ai/plugin'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import type { Plugin } from '@opencode-ai/plugin'
 
 interface InstructionFile {
   /** Glob patterns that determine when this instruction applies */
@@ -30,7 +30,7 @@ interface InstructionFile {
 }
 
 /** File tools that operate on file paths */
-const FILE_TOOLS = new Set(['edit', 'write'])
+const FILE_TOOLS = new Set(['edit', 'read', 'write'])
 
 /** Marker format used to track injected instructions in message history */
 const MARKER_PREFIX = 'path-instruction'
@@ -221,7 +221,6 @@ export const PathInstructionsPlugin: Plugin = async (ctx) => {
   }
 
   const projectDir = directory
-  const instructions = loadAllInstructionFiles(projectDir)
 
   // -------------------------------------------------------------------------
   // Instance-level state (scoped to this plugin invocation)
@@ -243,18 +242,6 @@ export const PathInstructionsPlugin: Plugin = async (ctx) => {
   const toast = (message: string, variant: 'info' | 'success' | 'warning' | 'error' = 'info', duration = 5000) =>
     client.tui.showToast({ body: { title: '📋 Path Instructions', message, variant, duration } })
 
-  if (instructions.length === 0) {
-    log('No path-specific instruction files found in .github/instructions or .opencode/instructions')
-    toast('No instruction files found', 'warning', 3000)
-  } else {
-    const names = instructions.map(i => i.name).join(', ')
-    log(`Loaded ${instructions.length} path instruction file(s):`)
-    for (const instr of instructions) {
-      log(`  ${getRelativePath(projectDir, instr.filePath)} → applyTo: ${instr.applyTo.join(', ')}`)
-    }
-    toast(`Loaded ${instructions.length} instruction(s): ${names}`, 'success', 4000)
-  }
-
   return {
     'tool.execute.before': async (input, output) => {
       if (!FILE_TOOLS.has(input.tool)) return
@@ -269,8 +256,9 @@ export const PathInstructionsPlugin: Plugin = async (ctx) => {
         sessionInjected.set(sessionId, new Set())
       }
       const injected = sessionInjected.get(sessionId)!
+      const currentInstructions = loadAllInstructionFiles(projectDir)
 
-      const matching = instructions.filter(
+      const matching = currentInstructions.filter(
         instr =>
           !injected.has(instr.filePath) &&
           instr.applyTo.some(pattern => matchesGlob(pattern, relativePath)),
@@ -320,7 +308,8 @@ export const PathInstructionsPlugin: Plugin = async (ctx) => {
       const injected = sessionInjected.get(sessionId)
       if (!injected || injected.size === 0) return
 
-      const activeInstructions = instructions.filter(instr => injected.has(instr.filePath))
+      const currentInstructions = loadAllInstructionFiles(projectDir)
+      const activeInstructions = currentInstructions.filter(instr => injected.has(instr.filePath))
       if (activeInstructions.length === 0) return
 
       const blocks = activeInstructions

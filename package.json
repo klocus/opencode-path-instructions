@@ -4,7 +4,7 @@
   "description": "OpenCode plugin that injects path-specific *.instructions.md files from .github/instructions and .opencode/instructions",
   "repository": {
     "type": "git",
-    "url": "https://github.com/klocus/opencode-path-instructions.git"
+    "url": "git+https://github.com/klocus/opencode-path-instructions.git"
   },
   "author": "Paweł Klockiewicz",
   "license": "MIT",

@@ -1,0 +1,38 @@
+{
+  "name": "@klocus/opencode-path-instructions",
+  "version": "1.0.0",
+  "description": "OpenCode plugin that injects path-specific *.instructions.md files from .github/instructions and .opencode/instructions",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/klocus/opencode-path-instructions.git"
+  },
+  "author": "Paweł Klockiewicz",
+  "license": "MIT",
+  "main": "./dist/path-instructions.js",
+  "types": "./dist/path-instructions.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "build:bundle": "bun build ./src/path-instructions.ts --outfile=dist/path-instructions.js --target=node --external:@opencode-ai/plugin",
+    "prepare": "bun build ./src/path-instructions.ts --outfile=dist/path-instructions.js --target=node --external:@opencode-ai/plugin",
+    "prepublishOnly": "npm run build:bundle",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": "*"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "^1.2.27",
+    "@types/node": "^25.5.0",
+    "typescript": "^5.9.3"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "copilot",
+    "instructions",
+    "path-specific"
+  ]
+}

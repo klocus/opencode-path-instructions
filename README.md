@@ -16,7 +16,6 @@ The plugin automatically injects context-specific coding standards into the AI a
   - `{a,b}` for multiple alternatives.
 - **YAML Frontmatter**: Easy configuration using standard YAML metadata at the top of instruction files.
 - **Automatic Discovery**: Scans `.github/instructions/` and `.opencode/instructions/` directories automatically.
-- **No External Dependencies**: Self-contained, no `npm install` required in your project.
 
 ## Installation
 
@@ -115,6 +114,6 @@ Usage examples:
   `./scripts/release.sh 1.2.3 --no-build --dry-run`
 
 Notes:
+
 - By default the CI workflow will publish packages via Trusted Publisher (OIDC) when a `v*.*.*` tag is pushed. Use `--publish` to perform a local `npm publish` from your machine instead.
 - Ensure you have permissions to publish and that your npm login is configured if using `--publish`.
-

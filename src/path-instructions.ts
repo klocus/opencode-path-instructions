@@ -266,11 +266,37 @@ export const PathInstructionsPlugin: Plugin = async (ctx) => {
 
       if (matching.length > 0) {
         for (const instr of matching) injected.add(instr.filePath)
-        pendingInjections.set(input.callID, { instructions: matching, relativePath })
-        log(
-          `Queued ${matching.length} instruction(s) for ${relativePath}: ${matching.map(i => i.name).join(', ')}`,
-          'debug',
-        )
+
+        if (input.tool === 'write' || input.tool === 'edit') {
+          const names = matching.map(i => i.name)
+          const instructionBlocks = matching
+            .map(instr => {
+              const patterns = instr.applyTo.join(', ')
+              return [
+                makeOpenMarker(instr.name),
+                `Path Instructions: ${instr.name} (applies to: ${patterns})`,
+                '',
+                instr.content.trimEnd(),
+                makeCloseMarker(instr.name),
+              ].join('\n')
+            })
+            .join('\n\n')
+
+          log(`Interrupting ${input.tool} for ${relativePath} to inject instructions: ${names.join(', ')}`)
+          toast(`Injected: ${names.join(', ')} (for ${relativePath})`, 'info', 3000)
+
+          throw new Error(
+            `Operation interrupted. New path-specific instructions apply to this file.\n` +
+            `Please review the instructions below and retry your \`${input.tool}\` operation taking them into account:\n\n` +
+            instructionBlocks
+          )
+        } else {
+          pendingInjections.set(input.callID, { instructions: matching, relativePath })
+          log(
+            `Queued ${matching.length} instruction(s) for ${relativePath}: ${matching.map(i => i.name).join(', ')}`,
+            'debug',
+          )
+        }
       }
     },
 
@@ -348,12 +374,15 @@ export const PathInstructionsPlugin: Plugin = async (ctx) => {
 
       for (const message of output.messages) {
         for (const part of message.parts) {
-          if (part.type === 'tool') {
-            const toolState = part.state as { output?: string }
-            if (toolState?.output) {
-              for (const name of extractMarkerNames(toolState.output)) {
-                presentNames.add(name)
-              }
+          if (part.type === 'tool' && part.state) {
+            const state = part.state as any
+            let text = ''
+            if (typeof state.output === 'string') text += state.output + '\n'
+            if (typeof state.error === 'string') text += state.error + '\n'
+            else if (typeof state.error?.message === 'string') text += state.error.message + '\n'
+
+            for (const name of extractMarkerNames(text)) {
+              presentNames.add(name)
             }
           }
         }

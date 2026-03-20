@@ -43,4 +43,4 @@ jobs:
         run: npm run build:bundle
 
       - name: Publish to npm (via Trusted Publisher OIDC)
-        run: npm publish --access public
+        run: npm publish --access public --provenance

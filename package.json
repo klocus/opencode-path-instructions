@@ -1,6 +1,6 @@
 {
   "name": "@klocus/opencode-path-instructions",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "OpenCode plugin that injects path-specific *.instructions.md files from .github/instructions and .opencode/instructions",
   "repository": {
     "type": "git",

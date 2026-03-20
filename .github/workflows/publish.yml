@@ -43,3 +43,5 @@ jobs:
 
       - name: Publish to npm (via Trusted Publisher OIDC)
         run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

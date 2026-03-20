@@ -95,3 +95,26 @@ When writing TypeScript:
 - Instructions injected in a session are tracked and not repeated.
 - On **session compaction**, injection state is cleared so instructions are re-injected when files are accessed again.
 - On **undo** operations that remove injected instructions from message history, the injection state is automatically reset so instructions can be re-injected.
+
+## Releasing
+
+A helper script is included at `scripts/release.sh` to bump the package version, build, push commits and tags, and optionally publish to npm.
+
+Usage examples:
+
+- Bump patch, build, push (and trigger CI publish):
+
+  ./scripts/release.sh
+
+- Bump minor and publish locally after push:
+
+  ./scripts/release.sh minor --publish
+
+- Explicit version, build skipped, dry run:
+
+  ./scripts/release.sh 1.2.3 --no-build --dry-run
+
+Notes:
+- By default the CI workflow will publish packages via Trusted Publisher (OIDC) when a `v*.*.*` tag is pushed. Use `--publish` to perform a local `npm publish` from your machine instead.
+- Ensure you have permissions to publish and that your npm login is configured if using `--publish`.
+

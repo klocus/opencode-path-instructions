@@ -1,4 +1,5 @@
 # CI workflow to build and publish the package to npm
+# Uses Trusted Publisher (OIDC). Configure Trusted Publisher in npm package settings and choose this repository + workflow filename.
 # Triggers on version tags (v*.*.*) and when a GitHub Release is published
 
 name: Publish to npm
@@ -9,6 +10,12 @@ on:
       - 'v*.*.*'
   release:
     types: [published]
+
+# Request an OIDC token so npm can verify this workflow as a trusted publisher
+permissions:
+  contents: read
+  id-token: write
+  packages: write
 
 jobs:
   publish:
@@ -22,6 +29,7 @@ jobs:
       - name: Setup Node.js and enable npm cache
         uses: actions/setup-node@v4
         with:
+          node-version: '18'
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
 
@@ -31,7 +39,5 @@ jobs:
       - name: Build bundle
         run: npm run build:bundle
 
-      - name: Publish to npm
+      - name: Publish to npm (via Trusted Publisher OIDC)
         run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

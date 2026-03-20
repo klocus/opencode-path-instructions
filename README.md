@@ -104,15 +104,15 @@ Usage examples:
 
 - Bump patch, build, push (and trigger CI publish):
 
-  ./scripts/release.sh
+  `./scripts/release.sh`
 
 - Bump minor and publish locally after push:
 
-  ./scripts/release.sh minor --publish
+  `./scripts/release.sh minor --publish`
 
 - Explicit version, build skipped, dry run:
 
-  ./scripts/release.sh 1.2.3 --no-build --dry-run
+  `./scripts/release.sh 1.2.3 --no-build --dry-run`
 
 Notes:
 - By default the CI workflow will publish packages via Trusted Publisher (OIDC) when a `v*.*.*` tag is pushed. Use `--publish` to perform a local `npm publish` from your machine instead.

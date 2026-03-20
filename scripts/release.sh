@@ -36,15 +36,8 @@ if [ -n "$(git status --porcelain)" ]; then
   exit 1
 fi
 
-# Bump version using npm (creates commit + tag)
-echo "Running: npm version $BUMP"
-if [ "$DRY_RUN" = true ]; then
-  echo "DRY: npm version $BUMP -m 'chore(release): %s'"
-else
-  npm version "$BUMP" -m "chore(release): %s"
-fi
-
-# Build bundle (unless skipped)
+# Build bundle first (before creating the version commit+tag) so that a build
+# failure doesn't leave behind a dangling commit and tag.
 if [ "$SKIP_BUILD" = false ]; then
   echo "Building bundle: npm run build:bundle"
   if [ "$DRY_RUN" = true ]; then
@@ -52,6 +45,14 @@ if [ "$SKIP_BUILD" = false ]; then
   else
     npm run build:bundle
   fi
+fi
+
+# Bump version using npm (creates commit + tag)
+echo "Running: npm version $BUMP"
+if [ "$DRY_RUN" = true ]; then
+  echo "DRY: npm version $BUMP -m 'chore(release): %s'"
+else
+  npm version "$BUMP" -m "chore(release): %s"
 fi
 
 # Push commits and tags to origin

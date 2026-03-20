@@ -30,7 +30,7 @@ interface InstructionFile {
 }
 
 /** File tools that operate on file paths */
-const FILE_TOOLS = new Set(['read', 'edit', 'write'])
+const FILE_TOOLS = new Set(['edit', 'write'])
 
 /** Marker format used to track injected instructions in message history */
 const MARKER_PREFIX = 'path-instruction'

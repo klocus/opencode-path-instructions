@@ -59,7 +59,7 @@ The plugin will handle the rest, notifying you via the tool output whenever path
 
 ### Injection
 
-When the AI performs a `read`, `edit`, or `write` operation on a file, the plugin:
+When the AI performs an `edit` or `write` operation on a file, the plugin:
 
 1. Finds all `*.instructions.md` files whose `applyTo` patterns match the target file path.
 2. Injects them **once per session** — subsequent operations on matching files won't repeat the injection.

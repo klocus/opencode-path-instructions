@@ -16,16 +16,56 @@ The plugin automatically injects context-specific coding standards into the AI a
   - `{a,b}` for multiple alternatives.
 - **YAML Frontmatter**: Easy configuration using standard YAML metadata at the top of instruction files.
 - **Automatic Discovery**: Scans `.github/instructions/` and `.opencode/instructions/` directories automatically.
+- **Agent Filtering**: Optionally restrict injection to specific agents (e.g. skip read-only agents like `explore`).
+- **Configurable Trigger Tools**: Control whether instructions are injected on `read`, `edit`, `write`, or any combination.
 
 ## Installation
-
-### As an npm package
 
 Add the package name to your `opencode.json`:
 
 ```json
 {
   "plugin": ["@klocus/opencode-path-instructions"]
+}
+```
+
+To enable agent filtering, pass options as a tuple:
+
+```json
+{
+  "plugin": [
+    ["@klocus/opencode-path-instructions", {
+      "agents": {
+        "mode": "blacklist",
+        "list": ["explore", "thread", "weft"]
+      }
+    }]
+  ]
+}
+```
+
+To restrict which tool operations trigger injection, use `injectOn`:
+
+```json
+{
+  "plugin": [
+    ["@klocus/opencode-path-instructions", {
+      "injectOn": ["edit", "write"]
+    }]
+  ]
+}
+```
+
+Both options can be combined:
+
+```json
+{
+  "plugin": [
+    ["@klocus/opencode-path-instructions", {
+      "agents": { "mode": "blacklist", "list": ["explore"] },
+      "injectOn": ["edit", "write"]
+    }]
+  ]
 }
 ```
 
@@ -64,6 +104,39 @@ When the AI performs an `edit`, `read` or `write` operation on a file, the plugi
 1. Finds all `*.instructions.md` files whose `applyTo` patterns match the target file path.
 2. Injects them **once per session** — subsequent operations on matching files won't repeat the injection.
 3. Appends the instructions to the tool output with a visible metadata header, so the AI can see which instructions were applied and follow them.
+
+### Agent filtering
+
+When `agents` options are provided, the plugin checks which agent is running before injecting instructions:
+
+- **`blacklist`** mode: inject for all agents **except** those listed.
+- **`whitelist`** mode: inject **only** for agents on the list.
+
+Agent names are the built-in subagent types: `explore`, `general`, `thread`, `warp`, `weft`, `pattern`, `shuttle`, `spindle`. Sessions without an identified agent (the main session) are treated as `"main"`.
+
+Without `agents` options (or with an empty list), the plugin injects instructions for all agents — same as original behavior.
+
+### Controlling injection triggers (`injectOn`)
+
+By default the plugin injects instructions when the AI performs **any** of `read`, `edit`, or `write`. You can narrow this with `injectOn`.
+
+**Injecting only on `edit` and `write`** (omit `read`):
+
+```json
+"injectOn": ["edit", "write"]
+```
+
+**Pros:**
+- Cleaner context for read-only exploration — instructions won't appear when the AI is only gathering information.
+- Reduces noise in sessions dominated by reading (e.g. code review agents, analysis tasks).
+- Slightly smaller context window usage on read-heavy operations.
+
+**Cons:**
+- The AI may read and immediately make decisions based on the file *before* instructions are injected. If a `read` is followed by an `edit` in the same turn, instructions will arrive only with the edit — the AI might already have formed an approach without them.
+- Instructions are shown to the AI later in the conversation, which can be less effective than receiving them upfront during the read phase.
+- If the AI reads a file but doesn't edit it in the same session (e.g. for reference), it will never see the applicable instructions.
+
+**When to use `["edit", "write"]`:** Best combined with `agents` filtering — if you've already excluded pure read-only agents, restricting `injectOn` on remaining agents adds little value and carries the cons above. Most useful when you have a single mixed agent that you want to influence only at write time.
 
 ### Frontmatter notes
 

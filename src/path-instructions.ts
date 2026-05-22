@@ -14,7 +14,7 @@
  *   Your instructions here...
  */
 
-import type { Plugin } from '@opencode-ai/plugin'
+import type { Plugin, PluginOptions } from '@opencode-ai/plugin'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
@@ -29,8 +29,23 @@ interface InstructionFile {
   name: string
 }
 
-/** File tools that operate on file paths */
-const FILE_TOOLS = new Set(['edit', 'read', 'write'])
+interface AgentFilterConfig {
+  /** 'whitelist' = only inject for listed agents; 'blacklist' = skip listed agents */
+  mode: 'whitelist' | 'blacklist'
+  /** Agent names (e.g. "explore", "general", "thread") */
+  list: string[]
+}
+
+type FileTool = 'read' | 'edit' | 'write'
+
+interface PluginConfig {
+  agents?: AgentFilterConfig
+  /** Tools that trigger injection. Defaults to ['read', 'edit', 'write'] when omitted or empty. */
+  injectOn?: FileTool[]
+}
+
+/** All file tools that operate on file paths */
+const ALL_FILE_TOOLS = new Set<string>(['edit', 'read', 'write'])
 
 /** Marker format used to track injected instructions in message history */
 const MARKER_PREFIX = 'path-instruction'
@@ -124,6 +139,46 @@ function parseApplyTo(frontmatter: string): string[] {
 }
 
 // ---------------------------------------------------------------------------
+// Agent filter configuration
+// ---------------------------------------------------------------------------
+
+function parsePluginConfig(options: PluginOptions | undefined): PluginConfig {
+  if (!options) return {}
+  const result: PluginConfig = {}
+
+  const agents = options['agents']
+  if (agents && typeof agents === 'object') {
+    result.agents = agents as AgentFilterConfig
+  }
+
+  const injectOn = options['injectOn']
+  if (Array.isArray(injectOn) && injectOn.length > 0) {
+    result.injectOn = (injectOn as string[]).filter(t => ALL_FILE_TOOLS.has(t)) as FileTool[]
+  }
+
+  return result
+}
+
+function buildActiveTools(config: PluginConfig): Set<string> {
+  if (!config.injectOn || config.injectOn.length === 0) return ALL_FILE_TOOLS
+  return new Set(config.injectOn)
+}
+
+function shouldInjectForAgent(agent: string | undefined, config: PluginConfig): boolean {
+  if (!config.agents) return true
+  const { mode, list } = config.agents
+  if (!list || list.length === 0) return true
+
+  const agentName = agent ?? 'main'
+
+  if (mode === 'whitelist') {
+    return list.includes(agentName)
+  }
+  // blacklist
+  return !list.includes(agentName)
+}
+
+// ---------------------------------------------------------------------------
 // Glob matching (no external dependencies)
 // ---------------------------------------------------------------------------
 
@@ -213,7 +268,7 @@ function extractMarkerNames(text: string): Set<string> {
 // Plugin export
 // ---------------------------------------------------------------------------
 
-export const PathInstructionsPlugin: Plugin = async (ctx) => {
+export const PathInstructionsPlugin: Plugin = async (ctx, options) => {
   const { directory, client } = ctx
 
   if (!directory || typeof directory !== 'string') {
@@ -232,6 +287,14 @@ export const PathInstructionsPlugin: Plugin = async (ctx) => {
   /** Maps callID → pending injection data (bridge between before/after hooks) */
   const pendingInjections = new Map<string, { instructions: InstructionFile[]; relativePath: string }>()
 
+  /** Maps sessionID → agent name (populated by chat.message hook) */
+  const sessionAgents = new Map<string, string>()
+
+  /** Plugin configuration (agent filtering) */
+  const pluginConfig = parsePluginConfig(options)
+
+  /** Tools that trigger instruction injection */
+  const activeTools = buildActiveTools(pluginConfig)
   // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------
@@ -243,8 +306,18 @@ export const PathInstructionsPlugin: Plugin = async (ctx) => {
     client.tui.showToast({ body: { title: '📋 Path Instructions', message, variant, duration } })
 
   return {
+    'chat.message': async (input) => {
+      if (input.agent) {
+        sessionAgents.set(input.sessionID, input.agent)
+      }
+    },
+
     'tool.execute.before': async (input, output) => {
-      if (!FILE_TOOLS.has(input.tool)) return
+      if (!activeTools.has(input.tool)) return
+
+      // Agent filtering: skip injection if agent is excluded by config
+      const agent = sessionAgents.get(input.sessionID)
+      if (!shouldInjectForAgent(agent, pluginConfig)) return
 
       const filePath = output.args?.filePath
       if (!filePath || typeof filePath !== 'string') return

@@ -169,13 +169,14 @@ function shouldInjectForAgent(agent: string | undefined, config: PluginConfig): 
   const { mode, list } = config.agents
   if (!list || list.length === 0) return true
 
-  const agentName = agent ?? 'main'
+  const agentName = (agent ?? 'main').toLowerCase()
+  const normalizedList = list.map(a => a.toLowerCase())
 
   if (mode === 'whitelist') {
-    return list.includes(agentName)
+    return normalizedList.includes(agentName)
   }
   // blacklist
-  return !list.includes(agentName)
+  return !normalizedList.includes(agentName)
 }
 
 // ---------------------------------------------------------------------------
@@ -308,7 +309,7 @@ export const PathInstructionsPlugin: Plugin = async (ctx, options) => {
   return {
     'chat.message': async (input) => {
       if (input.agent) {
-        sessionAgents.set(input.sessionID, input.agent)
+        sessionAgents.set(input.sessionID, input.agent.toLowerCase())
       }
     },
 

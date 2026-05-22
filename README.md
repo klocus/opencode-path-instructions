@@ -65,10 +65,6 @@ Usage examples:
 
   `./scripts/release.sh`
 
-- Bump minor and publish locally after push:
-
-  `./scripts/release.sh minor --publish`
-
 - Explicit version, build skipped, dry run:
 
   `./scripts/release.sh 1.2.3 --no-build --dry-run`

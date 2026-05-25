@@ -38,6 +38,13 @@ interface AgentFilterConfig {
 
 type FileTool = 'read' | 'edit' | 'write'
 
+interface FileTarget {
+  /** Project-relative file path */
+  relativePath: string
+  /** User-facing operation type this target represents */
+  tool: FileTool
+}
+
 interface PluginConfig {
   agents?: AgentFilterConfig
   /** Tools that trigger injection. Defaults to ['read', 'edit', 'write'] when omitted or empty. */
@@ -46,6 +53,9 @@ interface PluginConfig {
 
 /** All file tools that operate on file paths */
 const ALL_FILE_TOOLS = new Set<string>(['edit', 'read', 'write'])
+
+/** GPT-series models can receive this instead of edit/write tools. */
+const APPLY_PATCH_TOOL = 'apply_patch'
 
 /** Marker format used to track injected instructions in message history */
 const MARKER_PREFIX = 'path-instruction'
@@ -58,6 +68,56 @@ function getRelativePath(directory: string, filePath: string): string {
   const normalizedDir = directory.endsWith('/') ? directory.slice(0, -1) : directory
   if (!path.isAbsolute(filePath)) return filePath
   return path.relative(normalizedDir, filePath)
+}
+
+function normalizeRelativePath(filePath: string): string {
+  return filePath.replace(/\\/g, '/').replace(/^\.\//, '')
+}
+
+function extractFileTargets(tool: string, args: Record<string, unknown> | undefined, projectDir: string): FileTarget[] {
+  if (tool === 'read' || tool === 'edit' || tool === 'write') {
+    const filePath = args?.filePath
+    if (typeof filePath !== 'string' || !filePath) return []
+    return [{ relativePath: normalizeRelativePath(getRelativePath(projectDir, filePath)), tool }]
+  }
+
+  if (tool !== APPLY_PATCH_TOOL) return []
+
+  const patchText = args?.patchText
+  if (typeof patchText !== 'string' || !patchText) return []
+
+  const targets = new Map<string, FileTool>()
+  const addTarget = (filePath: string, targetTool: FileTool) => {
+    const relativePath = normalizeRelativePath(filePath.trim())
+    if (!relativePath) return
+    const currentTool = targets.get(relativePath)
+    if (currentTool === 'edit') return
+    targets.set(relativePath, targetTool)
+  }
+
+  for (const line of patchText.split(/\r?\n/)) {
+    let match = line.match(/^\*\*\* Add File: (.+)$/)
+    if (match) {
+      addTarget(match[1], 'write')
+      continue
+    }
+
+    match = line.match(/^\*\*\* Update File: (.+)$/)
+    if (match) {
+      addTarget(match[1], 'edit')
+      continue
+    }
+
+    match = line.match(/^\*\*\* Move to: (.+)$/)
+    if (match) {
+      addTarget(match[1], 'edit')
+      continue
+    }
+
+    if (line.match(/^\*\*\* Delete File: /)) continue
+  }
+
+  return Array.from(targets, ([relativePath, targetTool]) => ({ relativePath, tool: targetTool }))
 }
 
 function loadAllInstructionFiles(projectDir: string): InstructionFile[] {
@@ -314,16 +374,13 @@ export const PathInstructionsPlugin: Plugin = async (ctx, options) => {
     },
 
     'tool.execute.before': async (input, output) => {
-      if (!activeTools.has(input.tool)) return
+      const targets = extractFileTargets(input.tool, output.args, projectDir).filter(target => activeTools.has(target.tool))
+      if (targets.length === 0) return
 
       // Agent filtering: skip injection if agent is excluded by config
       const agent = sessionAgents.get(input.sessionID)
       if (!shouldInjectForAgent(agent, pluginConfig)) return
 
-      const filePath = output.args?.filePath
-      if (!filePath || typeof filePath !== 'string') return
-
-      const relativePath = getRelativePath(projectDir, filePath)
       const sessionId = input.sessionID
 
       if (!sessionInjected.has(sessionId)) {
@@ -332,18 +389,34 @@ export const PathInstructionsPlugin: Plugin = async (ctx, options) => {
       const injected = sessionInjected.get(sessionId)!
       const currentInstructions = loadAllInstructionFiles(projectDir)
 
-      const matching = currentInstructions.filter(
-        instr =>
-          !injected.has(instr.filePath) &&
-          instr.applyTo.some(pattern => matchesGlob(pattern, relativePath)),
-      )
+      const matching = new Map<string, InstructionFile>()
+      const relativePaths = new Set<string>()
+      let interrupts = false
 
-      if (matching.length > 0) {
-        for (const instr of matching) injected.add(instr.filePath)
+      for (const target of targets) {
+        for (const instr of currentInstructions) {
+          if (
+            !matching.has(instr.filePath) &&
+            !injected.has(instr.filePath) &&
+            instr.applyTo.some(pattern => matchesGlob(pattern, target.relativePath))
+          ) {
+            matching.set(instr.filePath, instr)
+            relativePaths.add(target.relativePath)
+            if (target.tool === 'write' || target.tool === 'edit') {
+              interrupts = true
+            }
+          }
+        }
+      }
 
-        if (input.tool === 'write' || input.tool === 'edit') {
-          const names = matching.map(i => i.name)
-          const instructionBlocks = matching
+      const instructions = Array.from(matching.values())
+      if (instructions.length > 0) {
+        for (const instr of instructions) injected.add(instr.filePath)
+        const displayPath = Array.from(relativePaths).join(', ')
+
+        if (interrupts) {
+          const names = instructions.map(i => i.name)
+          const instructionBlocks = instructions
             .map(instr => {
               const patterns = instr.applyTo.join(', ')
               return [
@@ -356,8 +429,8 @@ export const PathInstructionsPlugin: Plugin = async (ctx, options) => {
             })
             .join('\n\n')
 
-          log(`Interrupting ${input.tool} for ${relativePath} to inject instructions: ${names.join(', ')}`)
-          toast(`Injected: ${names.join(', ')} (for ${relativePath})`, 'info', 3000)
+          log(`Interrupting ${input.tool} for ${displayPath} to inject instructions: ${names.join(', ')}`)
+          toast(`Injected: ${names.join(', ')} (for ${displayPath})`, 'info', 3000)
 
           throw new Error(
             `Operation interrupted. New path-specific instructions apply to this file.\n` +
@@ -365,9 +438,9 @@ export const PathInstructionsPlugin: Plugin = async (ctx, options) => {
             instructionBlocks
           )
         } else {
-          pendingInjections.set(input.callID, { instructions: matching, relativePath })
+          pendingInjections.set(input.callID, { instructions, relativePath: displayPath })
           log(
-            `Queued ${matching.length} instruction(s) for ${relativePath}: ${matching.map(i => i.name).join(', ')}`,
+            `Queued ${instructions.length} instruction(s) for ${displayPath}: ${instructions.map(i => i.name).join(', ')}`,
             'debug',
           )
         }

@@ -31,7 +31,7 @@ Pass options as a tuple to enable agent filtering or control injection triggers:
 ```
 
 - **`agents`** — `mode` is `"blacklist"` (skip listed agents) or `"whitelist"` (only listed agents). The main session is identified as `"main"`.
-- **`injectOn`** — which operations trigger injection: `"read"`, `"edit"`, `"write"`. Defaults to all three.
+- **`injectOn`** — which operations trigger injection: `"read"`, `"edit"`, `"write"`. Defaults to all three. OpenCode patch operations are treated as `"edit"` for updates/moves and `"write"` for new files. Deleting files does not trigger injection.
 
 ### As a local plugin
 
